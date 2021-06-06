@@ -34,11 +34,8 @@ int main() {
             size_t const job_nr = 4;
             auto const width = 1920;
             std::vector<job_t> jobs{};
-            for (size_t i{ 0 }; auto const& job : pfc::jobs<double>{ "./jobs/" + pfc::jobs<double>::make_filename(job_nr) }) {
-                if (i == 3) {
-                    jobs.push_back(job);
-                }
-                i++;
+            for (auto const& job : pfc::jobs<double>{ "./jobs/" + pfc::jobs<double>::make_filename(job_nr) }) {
+                jobs.push_back(job);
             }
             
 
@@ -48,7 +45,7 @@ int main() {
             // Calculate fractals serial on CPU
             auto start{ std::chrono::high_resolution_clock::now() };
             for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
-                bmps_serial[i++] = fractal(width, cuDoubleComplex{ ll.real(), ll.imag() }, cuDoubleComplex{ ur.real(), ur.imag() });
+                bmps_serial[i++] = fractal(width, ll, ur);
             auto duration_serial{ std::chrono::high_resolution_clock::now() - start };
 
             std::cout << "Serial fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_serial) << "\n";
@@ -56,7 +53,7 @@ int main() {
             // Calculate fractals in parallel on CPU
             start = std::chrono::high_resolution_clock::now();
             for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
-                bmps_parallel[i++] = fractal_multithreaded(std::thread::hardware_concurrency(), width, cuDoubleComplex{ ll.real(), ll.imag() }, cuDoubleComplex{ ur.real(), ur.imag() });
+                bmps_parallel[i++] = fractal_multithreaded(std::thread::hardware_concurrency(), width, ll, ur);
             auto duration_parallel{ std::chrono::high_resolution_clock::now() - start };
 
             std::cout << "Parallel fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_parallel) << "\n";

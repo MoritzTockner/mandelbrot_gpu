@@ -6,10 +6,11 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <cuComplex.h>
+#include <complex>
 
 constexpr double g_infinity{ 4 };
 
-__forceinline__ __host__ __device__
+__forceinline__ __device__
 auto cuda_norm(cuDoubleComplex const& c) {
     return c.x * c.x + c.y * c.y;
 }
@@ -20,14 +21,21 @@ pfc::byte_t to_byte(T const value) {
     return static_cast<pfc::byte_t> (value);
 }
 
+template <typename T>
 __forceinline__ __host__ __device__
-pfc::bmp::pixel_t iterate(cuDoubleComplex const c) {
+pfc::bmp::pixel_t iterate(T const c) {
     std::size_t i{};
-    cuDoubleComplex z{};
+    T z{};
 
+#ifdef __CUDA_ARCH__
     while (cuda_norm(z) < g_infinity && ++i < 255) {
         z = cuCadd(cuCmul(z, z), c);
     }
+#else
+    while (std::norm(z) < g_infinity && ++i < 255) {
+        z = z * z + c;
+    }
+#endif
 
     pfc::bmp::pixel_t pixel{};
     pixel.green = to_byte(i);
