@@ -19,7 +19,9 @@
 
 int main() {
     
-    using job_t = pfc::jobs<double>::job_t;
+    using coord_t = float;
+    using coord2_t = float2;
+    using job_t = pfc::jobs<coord_t>::job_t;
 
     try {
         int count{};
@@ -34,7 +36,7 @@ int main() {
             size_t const job_nr = 32;
             auto const width = 2048;
             std::vector<job_t> jobs{};
-            for (size_t i{ 0 };  auto const& job : pfc::jobs<double>{ "./jobs/" + pfc::jobs<double>::make_filename(job_nr) }) {
+            for (size_t i{ 0 };  auto const& job : pfc::jobs<coord_t>{ "./jobs/" + pfc::jobs<coord_t>::make_filename(job_nr) }) {
                 jobs.push_back(job);
             }
             
@@ -72,7 +74,15 @@ int main() {
 
                 auto dp_pixels{ gpp2::make_unique<pfc::bmp::pixel_t>(size) };
 
-                check(fractal_gpu(big, tib, dp_pixels.get(), bmps_parallel_gpu[i].width(), bmps_parallel_gpu[i].height(), double2{ ll.real(), ll.imag() }, double2{ ur.real(), ur.imag() }));
+                check(fractal_gpu(
+                    big, 
+                    tib, 
+                    dp_pixels.get(), 
+                    bmps_parallel_gpu[i].width(), 
+                    bmps_parallel_gpu[i].height(), 
+                    cuFloatComplex{ coord2_t{ ll.real(), ll.imag() } },
+                    cuFloatComplex{ coord2_t{ ur.real(), ur.imag() } }));
+
                 check(cudaMemcpy(bmps_parallel_gpu[i].data(), dp_pixels.get(), size * sizeof(pfc::bmp::pixel_t), cudaMemcpyDeviceToHost));
                 i++;
             }
