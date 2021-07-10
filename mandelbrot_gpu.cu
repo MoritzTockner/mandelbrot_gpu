@@ -1,6 +1,11 @@
 
 #include "mandelbrot_gpu.h"
 
+__device__
+auto cuda_norm(cuDoubleComplex const& c) {
+    return c.x * c.x + c.y * c.y;
+}
+
 __global__ 
 static void fractal_gpu_kernel(pfc::bmp::pixel_t* const pixels, size_t const width, size_t const height, cuDoubleComplex const ll, double const d) {
     auto t{ blockIdx.x * blockDim.x + threadIdx.x };

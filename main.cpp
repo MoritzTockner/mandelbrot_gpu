@@ -31,10 +31,10 @@ int main() {
 
             std::cout << prop.name << " (" << prop.major << "." << prop.minor << ")\n";
 
-            size_t const job_nr = 4;
-            auto const width = 1920;
+            size_t const job_nr = 32;
+            auto const width = 2048;
             std::vector<job_t> jobs{};
-            for (auto const& job : pfc::jobs<double>{ "./jobs/" + pfc::jobs<double>::make_filename(job_nr) }) {
+            for (size_t i{ 0 };  auto const& job : pfc::jobs<double>{ "./jobs/" + pfc::jobs<double>::make_filename(job_nr) }) {
                 jobs.push_back(job);
             }
             
@@ -84,29 +84,30 @@ int main() {
             std::cout << "=================================================\n";
 
             // Compare results
-            for (size_t i{ 0 }; i < bmps_serial.size(); i++) {
-                for (size_t y{ 0 }; y < bmps_serial[i].height(); y++) {
-                    for (size_t x{ 0 }; x < bmps_serial[i].width(); x++) {
-                        if (bmps_serial[i].at(x, y).green != bmps_parallel[i].at(x, y).green ||
-                            bmps_parallel_gpu[i].at(x, y).green != bmps_parallel[i].at(x, y).green) {
-                            std::cerr << "Results not equal at bitmap nr. " << i << " (" << x << ", " << y << ")\n";
-                            std::cerr << "Serial pixel: " << int{ bmps_serial[i].at(x, y).green } << "\n";
-                            std::cerr << "Parallel pixel: " << int{ bmps_parallel[i].at(x, y).green } << "\n";
-                            std::cerr << "Parallel GPU pixel: " << int{ bmps_parallel_gpu[i].at(x, y).green } << "\n";
-                            //return -1;
-                        }
-                    }
-                }
-            }
+            //for (size_t i{ 0 }; i < bmps_serial.size(); i++) {
+            //    for (size_t y{ 0 }; y < bmps_serial[i].height(); y++) {
+            //        for (size_t x{ 0 }; x < bmps_serial[i].width(); x++) {
+            //            if (bmps_serial[i].at(x, y).green != bmps_parallel[i].at(x, y).green ||
+            //                bmps_parallel_gpu[i].at(x, y).green != bmps_parallel[i].at(x, y).green) {
+            //                std::cerr << "Results not equal at bitmap nr. " << i << " (" << x << ", " << y << ")\n";
+            //                std::cerr << "Serial pixel: " << int{ bmps_serial[i].at(x, y).green } << "\n";
+            //                std::cerr << "Parallel pixel: " << int{ bmps_parallel[i].at(x, y).green } << "\n";
+            //                std::cerr << "Parallel GPU pixel: " << int{ bmps_parallel_gpu[i].at(x, y).green } << "\n";
+            //                //return -1;
+            //            }
+            //        }
+            //    }
+            //}
 
             //std::cout << "Results are equal\n";
 
+            std::string bmp_folder = "bitmaps";
             for (size_t i{ 0 }; auto const& bmp : bmps_serial)
-                bmp.to_file("./bitmap-serial-" + std::to_string(++i) + ".bmp");
+                bmp.to_file(bmp_folder + "/bitmap-serial-" + std::to_string(++i) + ".bmp");
             for (size_t i{ 0 }; auto const& bmp : bmps_parallel)
-                bmp.to_file("./bitmap-parallel-" + std::to_string(++i) + ".bmp");
+                bmp.to_file(bmp_folder + "/bitmap-parallel-" + std::to_string(++i) + ".bmp");
             for (size_t i{ 0 }; auto const& bmp : bmps_parallel_gpu)
-                bmp.to_file("./bitmap-parallel-gpu-" + std::to_string(++i) + ".bmp");
+                bmp.to_file(bmp_folder + "/bitmap-parallel-gpu-" + std::to_string(++i) + ".bmp");
         }
     }
     catch (std::runtime_error const& ex) {

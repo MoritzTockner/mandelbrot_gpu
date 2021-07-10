@@ -8,16 +8,14 @@
 #include <cuComplex.h>
 #include <complex>
 
-constexpr double g_infinity{ 4 };
+constexpr static const double g_infinity{ 4 };
 
-__forceinline__ __device__
-auto cuda_norm(cuDoubleComplex const& c) {
-    return c.x * c.x + c.y * c.y;
-}
+__device__
+auto cuda_norm(cuDoubleComplex const& c);
 
 template <typename T>
 __host__ __device__
-pfc::byte_t to_byte(T const value) {
+auto to_byte(T const value) {
     return static_cast<pfc::byte_t> (value);
 }
 
