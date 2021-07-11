@@ -24,7 +24,7 @@ auto to_byte(T const value) {
 
 template <typename TComplex>
 __forceinline__ __host__ __device__
-pfc::bmp::pixel_t iterate(TComplex const c) {
+auto iterate(TComplex const c) {
     std::size_t i{};
     TComplex z{};
 
@@ -36,8 +36,8 @@ pfc::bmp::pixel_t iterate(TComplex const c) {
     while (std::norm(z) < g_infinity && ++i < 255) {
         z = z * z + c;
     }
-#endif
 
+#endif
     pfc::bmp::pixel_t pixel{};
     pixel.green = to_byte(i);
 

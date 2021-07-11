@@ -17,11 +17,16 @@
 
 
 
-int main() {
+int main(int const argc, char* const* const argv) {
     
     using coord_t = float;
     using coord2_t = float2;
     using job_t = pfc::jobs<coord_t>::job_t;
+
+    bool calc_cpu_serial = false;
+    bool calc_cpu_parallel = false;
+    bool calc_gpu_parallel = true;
+    std::string bmp_folder = "bitmaps";
 
     try {
         int count{};
@@ -44,54 +49,76 @@ int main() {
             std::vector<pfc::bitmap> bmps_serial{ jobs.size() };
             std::vector<pfc::bitmap> bmps_parallel{ jobs.size() };
 
-            // Calculate fractals serial on CPU
-            auto start{ std::chrono::high_resolution_clock::now() };
-            for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
-                bmps_serial[i++] = fractal(width, ll, ur);
-            auto duration_serial{ std::chrono::high_resolution_clock::now() - start };
+            std::chrono::nanoseconds duration_serial{ 0 };
+            if (calc_cpu_serial) {
+                // Calculate fractals serial on CPU
+                auto start{ std::chrono::high_resolution_clock::now() };
+                for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
+                    bmps_serial[i++] = fractal(width, ll, ur);
+                duration_serial = std::chrono::high_resolution_clock::now() - start;
 
-            std::cout << "Serial fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_serial) << "\n";
+                std::cout << "Serial fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_serial) << "\n";
 
-            // Calculate fractals in parallel on CPU
-            start = std::chrono::high_resolution_clock::now();
-            for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
-                bmps_parallel[i++] = fractal_multithreaded(std::thread::hardware_concurrency(), width, ll, ur);
-            auto duration_parallel{ std::chrono::high_resolution_clock::now() - start };
+                for (size_t i{ 0 }; auto const& bmp : bmps_serial)
+                    bmp.to_file(bmp_folder + "/bitmap-serial-" + std::to_string(++i) + ".bmp");
+            }
 
-            std::cout << "Parallel fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_parallel) << "\n";
+            std::chrono::nanoseconds duration_parallel{ 0 };
+            if (calc_cpu_parallel) {
+                // Calculate fractals in parallel on CPU
+                auto start = std::chrono::high_resolution_clock::now();
+                for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs)
+                    bmps_parallel[i++] = fractal_multithreaded(std::thread::hardware_concurrency(), width, ll, ur);
+                duration_parallel = std::chrono::high_resolution_clock::now() - start;
+
+                std::cout << "Parallel fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_parallel) << "\n";
+
+                for (size_t i{ 0 }; auto const& bmp : bmps_parallel)
+                    bmp.to_file(bmp_folder + "/bitmap-parallel-" + std::to_string(++i) + ".bmp");
+            }
 
             // Calculate fractals in parallel on GPU
-            std::vector<pfc::bitmap> bmps_parallel_gpu{ jobs.size() };
+            std::chrono::nanoseconds duration_parallel_gpu{ 0 };
+            if (calc_gpu_parallel) {
+                std::vector<pfc::bitmap> bmps_parallel_gpu{ jobs.size() };
 
-            int tib{ 32 };
-            start = std::chrono::high_resolution_clock::now();
-            for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs) {
-                auto const complex_width{ (ur - ll).real() };
-                auto const complex_height{ (ur - ll).imag() };
-                bmps_parallel_gpu[i].create(width, static_cast<std::size_t>(complex_height / complex_width * width));
-                auto const size = bmps_parallel_gpu[i].width() * bmps_parallel_gpu[i].height();
-                int big((static_cast<int>(size) + tib - 1) / tib);
+                int tib{ 64 };
+                auto start = std::chrono::high_resolution_clock::now();
+                for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs) {
+                    auto const complex_width{ (ur - ll).real() };
+                    auto const complex_height{ (ur - ll).imag() };
+                    bmps_parallel_gpu[i].create(width, static_cast<std::size_t>(complex_height / complex_width * width));
+                    auto const size = bmps_parallel_gpu[i].width() * bmps_parallel_gpu[i].height();
+                    int big((static_cast<int>(size) + tib - 1) / tib);
 
-                auto dp_pixels{ gpp2::make_unique<pfc::bmp::pixel_t>(size) };
+                    auto dp_pixels{ gpp2::make_unique<pfc::bmp::pixel_t>(size) };
 
-                check(fractal_gpu(
-                    big, 
-                    tib, 
-                    dp_pixels.get(), 
-                    bmps_parallel_gpu[i].width(), 
-                    bmps_parallel_gpu[i].height(), 
-                    cuFloatComplex{ coord2_t{ ll.real(), ll.imag() } },
-                    cuFloatComplex{ coord2_t{ ur.real(), ur.imag() } }));
+                    check(fractal_gpu(
+                        big,
+                        tib,
+                        dp_pixels.get(),
+                        bmps_parallel_gpu[i].width(),
+                        bmps_parallel_gpu[i].height(),
+                        coord2_t{ ll.real(), ll.imag() },
+                        coord2_t{ ur.real(), ur.imag() }));
 
-                check(cudaMemcpy(bmps_parallel_gpu[i].data(), dp_pixels.get(), size * sizeof(pfc::bmp::pixel_t), cudaMemcpyDeviceToHost));
-                i++;
+                    check(cudaMemcpy(bmps_parallel_gpu[i].data(), dp_pixels.get(), size * sizeof(pfc::bmp::pixel_t), cudaMemcpyDeviceToHost));
+                    i++;
+                }
+                duration_parallel_gpu = std::chrono::high_resolution_clock::now() - start;
+                std::cout << "Parallel GPU fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_parallel_gpu) << "\n";
+
+                for (size_t i{ 0 }; auto const& bmp : bmps_parallel_gpu)
+                    bmp.to_file(bmp_folder + "/bitmap-parallel-gpu-" + std::to_string(++i) + ".bmp");
             }
-            auto duration_parallel_gpu{ std::chrono::high_resolution_clock::now() - start };
-            std::cout << "Parallel GPU fractal duration: " << std::chrono::duration_cast<std::chrono::milliseconds>(duration_parallel_gpu) << "\n";
-
-            std::cout << "Speedup parallel CPU: " << duration_serial / duration_parallel << '\n';
-            std::cout << "Speedup parallel GPU: " << duration_serial / duration_parallel_gpu << '\n';
-            std::cout << "=================================================\n";
+            
+            if (calc_cpu_serial) {
+                if (calc_cpu_parallel) 
+                    std::cout << "Speedup parallel CPU: " << duration_serial / duration_parallel << '\n';
+                if (calc_gpu_parallel)
+                    std::cout << "Speedup parallel GPU: " << duration_serial / duration_parallel_gpu << '\n';
+                std::cout << "=================================================\n";
+            }
 
             // Compare results
             //for (size_t i{ 0 }; i < bmps_serial.size(); i++) {
@@ -111,13 +138,6 @@ int main() {
 
             //std::cout << "Results are equal\n";
 
-            std::string bmp_folder = "bitmaps";
-            for (size_t i{ 0 }; auto const& bmp : bmps_serial)
-                bmp.to_file(bmp_folder + "/bitmap-serial-" + std::to_string(++i) + ".bmp");
-            for (size_t i{ 0 }; auto const& bmp : bmps_parallel)
-                bmp.to_file(bmp_folder + "/bitmap-parallel-" + std::to_string(++i) + ".bmp");
-            for (size_t i{ 0 }; auto const& bmp : bmps_parallel_gpu)
-                bmp.to_file(bmp_folder + "/bitmap-parallel-gpu-" + std::to_string(++i) + ".bmp");
         }
     }
     catch (std::runtime_error const& ex) {
