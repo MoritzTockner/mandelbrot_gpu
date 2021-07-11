@@ -23,9 +23,9 @@ int main(int const argc, char* const* const argv) {
     using coord2_t = float2;
     using job_t = pfc::jobs<coord_t>::job_t;
 
-    bool calc_cpu_serial = false;
-    bool calc_cpu_parallel = false;
-    bool calc_gpu_parallel = true;
+    static const bool calc_cpu_serial = true;
+    static const bool calc_cpu_parallel = false;
+    static const bool calc_gpu_parallel = true;
     std::string bmp_folder = "bitmaps";
 
     try {
@@ -38,10 +38,10 @@ int main(int const argc, char* const* const argv) {
 
             std::cout << prop.name << " (" << prop.major << "." << prop.minor << ")\n";
 
-            size_t const job_nr = 32;
+            static size_t const job_nr = 32;
             auto const width = 2048;
             std::vector<job_t> jobs{};
-            for (size_t i{ 0 };  auto const& job : pfc::jobs<coord_t>{ "./jobs/" + pfc::jobs<coord_t>::make_filename(job_nr) }) {
+            for (auto const& job : pfc::jobs<coord_t>{ "./jobs/" + pfc::jobs<coord_t>::make_filename(job_nr) }) {
                 jobs.push_back(job);
             }
             
@@ -83,16 +83,26 @@ int main(int const argc, char* const* const argv) {
                 std::vector<pfc::bitmap> bmps_parallel_gpu{ jobs.size() };
 
                 int tib{ 64 };
+                cudaStream_t stream[job_nr];
+                for (size_t i{ 0 }; i < job_nr; i++)
+                    cudaStreamCreate(&stream[i]);
+
                 auto start = std::chrono::high_resolution_clock::now();
                 for (size_t i{ 0 }; auto const& [ll, ur, cp, wh] : jobs) {
                     auto const complex_width{ (ur - ll).real() };
                     auto const complex_height{ (ur - ll).imag() };
+
+                    // Allocate host memory
                     bmps_parallel_gpu[i].create(width, static_cast<std::size_t>(complex_height / complex_width * width));
                     auto const size = bmps_parallel_gpu[i].width() * bmps_parallel_gpu[i].height();
-                    int big((static_cast<int>(size) + tib - 1) / tib);
 
+                    // Page-lock host memory
+                    check(cudaHostRegister(bmps_parallel_gpu[i].data(), size * sizeof(pfc::bmp::pixel_t), cudaHostRegisterPortable));
+
+                    // Allocate device memory
                     auto dp_pixels{ gpp2::make_unique<pfc::bmp::pixel_t>(size) };
 
+                    int big((static_cast<int>(size) + tib - 1) / tib);
                     check(fractal_gpu(
                         big,
                         tib,
@@ -100,9 +110,10 @@ int main(int const argc, char* const* const argv) {
                         bmps_parallel_gpu[i].width(),
                         bmps_parallel_gpu[i].height(),
                         coord2_t{ ll.real(), ll.imag() },
-                        coord2_t{ ur.real(), ur.imag() }));
+                        coord2_t{ ur.real(), ur.imag() },
+                        stream[i]));
 
-                    check(cudaMemcpy(bmps_parallel_gpu[i].data(), dp_pixels.get(), size * sizeof(pfc::bmp::pixel_t), cudaMemcpyDeviceToHost));
+                    check(cudaMemcpyAsync(bmps_parallel_gpu[i].data(), dp_pixels.get(), size * sizeof(pfc::bmp::pixel_t), cudaMemcpyDeviceToHost, stream[i]));
                     i++;
                 }
                 duration_parallel_gpu = std::chrono::high_resolution_clock::now() - start;
