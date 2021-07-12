@@ -83,8 +83,9 @@ int main(int const argc, char* const* const argv) {
                 std::vector<pfc::bitmap> bmps_parallel_gpu{ jobs.size() };
 
                 int tib{ 64 };
-                cudaStream_t stream[job_nr];
-                for (size_t i{ 0 }; i < job_nr; i++)
+                static const size_t nr_of_streams = 1;
+                cudaStream_t stream[nr_of_streams];
+                for (size_t i{ 0 }; i < nr_of_streams; i++)
                     cudaStreamCreate(&stream[i]);
 
                 auto start = std::chrono::high_resolution_clock::now();
@@ -130,24 +131,6 @@ int main(int const argc, char* const* const argv) {
                     std::cout << "Speedup parallel GPU: " << duration_serial / duration_parallel_gpu << '\n';
                 std::cout << "=================================================\n";
             }
-
-            // Compare results
-            //for (size_t i{ 0 }; i < bmps_serial.size(); i++) {
-            //    for (size_t y{ 0 }; y < bmps_serial[i].height(); y++) {
-            //        for (size_t x{ 0 }; x < bmps_serial[i].width(); x++) {
-            //            if (bmps_serial[i].at(x, y).green != bmps_parallel[i].at(x, y).green ||
-            //                bmps_parallel_gpu[i].at(x, y).green != bmps_parallel[i].at(x, y).green) {
-            //                std::cerr << "Results not equal at bitmap nr. " << i << " (" << x << ", " << y << ")\n";
-            //                std::cerr << "Serial pixel: " << int{ bmps_serial[i].at(x, y).green } << "\n";
-            //                std::cerr << "Parallel pixel: " << int{ bmps_parallel[i].at(x, y).green } << "\n";
-            //                std::cerr << "Parallel GPU pixel: " << int{ bmps_parallel_gpu[i].at(x, y).green } << "\n";
-            //                //return -1;
-            //            }
-            //        }
-            //    }
-            //}
-
-            //std::cout << "Results are equal\n";
 
         }
     }

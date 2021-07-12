@@ -33,7 +33,7 @@ auto iterate(TComplex const c) {
     for (; i < 255; i++) {
         if (norm(z) >= g_infinity)
             break;
-    //while (norm(z) < g_infinity && ++i < 255) {
+        //while (norm(z) < g_infinity && ++i < 255) {
         z = cuCaddf(cuCmulf(z, z), c);
     }
 #else
@@ -49,12 +49,12 @@ auto iterate(TComplex const c) {
 
 template <typename TComplex, typename T>
 __global__
-static void fractal_gpu_kernel(pfc::bmp::pixel_t* const pixels, size_t const width, size_t const height, TComplex const ll, T const d) {
+static void fractal_gpu_kernel(pfc::bmp::pixel_t* const pixels, size_t const nr_of_pixels, size_t const width, TComplex const ll, T const d) {
     auto t{ blockIdx.x * blockDim.x + threadIdx.x };
 
     TComplex const c{ ll.x + d * (t % width), ll.y + d * (t / width) };
 
-    if (t < width * height)
+    if (t < nr_of_pixels)
         pixels[t] = iterate(c);
 
 }
