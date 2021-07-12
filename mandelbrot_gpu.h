@@ -8,16 +8,12 @@
 #include <cuComplex.h>
 #include <complex>
 
-constexpr static const float g_infinity{ 4 };
+constexpr static const float g_infinity{ 4.0f };
 
 template <typename TComplex>
 __device__
 auto norm(TComplex const& c) {
-#ifdef __CUDA_ARCH__
     return c.x * c.x + c.y * c.y;
-#else
-    return std::norm(c);
-#endif
 }
 
 template <typename T>
@@ -29,13 +25,22 @@ auto to_byte(T const value) {
 template <typename TComplex>
 __forceinline__ __host__ __device__
 auto iterate(TComplex const c) {
-    std::size_t i{};
+    int i{};
     TComplex z{};
 
-    while (norm(z) < g_infinity && ++i < 255) {
+#ifdef __CUDA_ARCH__
+    #pragma unroll
+    for (; i < 255; i++) {
+        if (norm(z) >= g_infinity)
+            break;
+    //while (norm(z) < g_infinity && ++i < 255) {
+        z = cuCaddf(cuCmulf(z, z), c);
+    }
+#else
+    while (std::norm(z) < g_infinity && ++i < 255) {
         z = z * z + c;
     }
-
+#endif
     pfc::bmp::pixel_t pixel{};
     pixel.green = to_byte(i);
 
@@ -63,6 +68,14 @@ cudaError_t fractal_gpu(
     height, cuFloatComplex const ll,
     cuFloatComplex const ur,
     cudaStream_t & stream);
+
+cudaError_t fractal_gpu(
+    dim3 big,
+    dim3 tib,
+    pfc::bmp::pixel_t* const pixels,
+    size_t const width, size_t const
+    height, cuFloatComplex const ll,
+    cuFloatComplex const ur);
 
 
 #endif
